@@ -311,6 +311,8 @@ def createVariables():
 def defaultFileSetup():
     global header
 
+    header = ['funcType', 'function']
+
     # Load the keybinds if the file exists, create a default file if it doesn't
     if os.path.isfile("keybinds.csv"):
         makeBtns()
@@ -320,7 +322,6 @@ def defaultFileSetup():
         for x in range(16):
             writeData.append(("X", " "))
 
-        header = ['funcType', 'function']
 
         data = pd.DataFrame(writeData, columns=header)
         data.to_csv("keybinds.csv", index=False)
