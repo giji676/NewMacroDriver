@@ -322,7 +322,6 @@ def defaultFileSetup():
         for x in range(16):
             writeData.append(("X", " "))
 
-
         data = pd.DataFrame(writeData, columns=header)
         data.to_csv("keybinds.csv", index=False)
 
@@ -458,17 +457,20 @@ def main():
 
 
 def quitWindow(icon, item):
+    # Closes the program completely from the system tray
     icon.stop()
     win.destroy()
     quit()
 
 
 def showWindow(icon, item):
+    # Moves the window from the system tray back to normal
     icon.stop()
     win.after(0, win.deiconify())
 
 
 def hideWindow():
+    # Hides the window to the system tray
     win.withdraw()
     image = Image.open("assets/icon.ico")
     menu = (item('Quit', quitWindow), item('Show', showWindow))
