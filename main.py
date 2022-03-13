@@ -466,12 +466,16 @@ def quitWindow(icon, item):
 def showWindow(icon, item):
     # Moves the window from the system tray back to normal
     icon.stop()
-    win.after(0, win.deiconify())
+    win.update()
+    win.deiconify()
+    win.deiconify()
 
 
 def hideWindow():
-    # Hides the window to the system tray
+    # Hides the tkinter window
     win.withdraw()
+
+    # Creates a system tray item, with the icon, and show/quit buttons
     image = Image.open("assets/icon.ico")
     menu = (item('Quit', quitWindow), item('Show', showWindow))
     icon = pystray.Icon("name", image, "Macro Pad Driver", menu)

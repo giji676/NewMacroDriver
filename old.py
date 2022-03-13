@@ -248,7 +248,7 @@ def show_window(icon, item):
 
 def hide_window():
 	win.withdraw()
-	image=Image.open("icon.ico")
+	image=Image.open("assets/icon.ico")
 	menu=(item('Quit', quit_window), item('Show', show_window))
 	icon=pystray.Icon("name", image, "Macro Pad Driver", menu)
 	icon.run()
