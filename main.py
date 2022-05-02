@@ -11,9 +11,10 @@ import threading
 import keyboard
 import serial
 import time
+import sys
 import os
 
-from obsFunctions import OBS
+from obs.obsFunctions import OBS
 obs = None
 
 
@@ -548,8 +549,11 @@ def hardwareCheck(port):
 
 
 def btnListen():
-    global obs
+    global obs, btnListenRun
+    btnListenRun = True
     while True:
+        if not btnListenRun:
+            sys.exit()
         if serialPort.in_waiting > 0:
             serialString = serialPort.readline()
             msg = int(serialString.decode("Ascii")) - 1
@@ -598,6 +602,7 @@ def btnListen():
                         pass
             except:
                 pass
+        time.sleep(0.01)
 
 
 def main():
@@ -620,7 +625,7 @@ def main():
                 except:
                     pass
 
-    global mainFrame, bindFrame, runProgramFrame, macroRecordFrame, textEnterFrame, linkEnterFrame, obsFrame
+    global mainFrame, bindFrame, runProgramFrame, macroRecordFrame, textEnterFrame, linkEnterFrame, obsFrame, btnPressListen
     global grid
 
     backgroundImg = PhotoImage(file="assets/background.png")  # Background image of the MainFrame
@@ -662,6 +667,9 @@ def main():
 
 def quitWindow(icon, item):
     # Closes the program completely from the system tray
+    global btnListenRun
+    btnListenRun = False
+    serialPort.close()
     icon.stop()
     win.destroy()
 
@@ -669,7 +677,8 @@ def quitWindow(icon, item):
         obs.disconnect()
     except:
         pass
-    quit()
+
+    sys.exit()
 
 
 def showWindow(icon, item):
