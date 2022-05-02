@@ -13,6 +13,10 @@ import serial
 import time
 import os
 
+from obsFunctions import OBS
+obs = None
+
+
 # Initial window setup, non-resizable
 win = Tk()
 win.title("Macro Pad Driver")
@@ -27,11 +31,12 @@ class Btn:
         self.btn = Button(root, image=btnImg, command=lambda: changeFrame(bindFrame, mainFrame, self.id))
         self.btn.place(x=self.x * 100, y=self.y * 120 + 160, width=100, height=120)
 
-        self.funcType = None  # 0 = Run Program, 1 = Keystroke, 2 = Text, 3 = Link
+        self.funcType = None  # 0 = Run Program, 1 = Keystroke, 2 = Text, 3 = Link, 4 = Obs function
         self.path = None
         self.text = None
         self.macro = None
         self.url = None
+        self.obs = None
 
 
 """ ---Create Frames--- """
@@ -61,8 +66,11 @@ def createBindFrame():
     linkBtn = Button(frame, text="Link", command=lambda: changeFrame(linkEnterFrame, bindFrame, None))
     linkBtn.place(x=0, y=150, width=400, height=50)
 
-    closeBtn = Button(frame, text="close", command=lambda: changeFrame(mainFrame, bindFrame, None))
-    closeBtn.place(x=0, y=200, width=400, height=50)
+    obsBtn = Button(frame, text="OBS", command=lambda: changeFrame(obsFrame, bindFrame, None))
+    obsBtn.place(x=0, y=200, width=400, height=50)
+
+    closeBtn = Button(frame, text="Close", command=lambda: changeFrame(mainFrame, bindFrame, None))
+    closeBtn.place(x=0, y=250, width=400, height=50)
     return frame
 
 
@@ -142,6 +150,45 @@ def createLinkEnterFrame():
     return frame
 
 
+def createObsFrame():
+    # Frame displayed after OBS button is pressed from the bind menu frame
+    frame = Frame(win)
+
+    # Options in the dropdown menu
+    obsOptions = [
+        "Mic mute",
+        "Desktop mute",
+        "Switch screen",
+        "Start stream",
+        "Stop stream",
+        "Start recording",
+        "Stop recording",
+        "Pause recording",
+        "Resume recording"
+    ]
+
+    optionOM = OptionMenu(frame, opVar, *obsOptions)  # The picked choice gets stored in opVar
+    optionOM.place(x=0, y=0, width=400, height=50)
+
+    saveBtn = Button(frame, text="Save", command=lambda: saveObsFunctions())
+    saveBtn.place(x=0, y=50, width=400, height=50)
+
+    return frame
+
+
+def createObsSwitchFrame(scenes):
+    # Frame displayed after Switch Scene is selected from the OBS frame
+    frame = Frame(win)
+
+    optionOM = OptionMenu(frame, sceneVar, *scenes)  # The picked choice gets stored in sceneVar
+    optionOM.place(x=0, y=0, width=400, height=50)
+
+    saveBtn = Button(frame, text="Save", command=lambda: saveSwitchFrame())
+    saveBtn.place(x=0, y=50, width=400, height=50)
+
+    return frame
+
+
 """ ---Keybind Functions--- """
 
 
@@ -187,7 +234,7 @@ def getKeyStrokes():
             if recorded[newX].name == recorded[newX-1].name and recorded[newX].event_type == recorded[newX-1].event_type:
                 recorded.pop(newX)
                 offset += 1
-    recorded.pop() # Pops the Enter keystroke from the end of the list
+    recorded.pop()  # Pops the Enter keystroke from the end of the list
 
     for key in recorded:
         keyStrokes.append((key.name, key.event_type))
@@ -213,15 +260,19 @@ def saveKeyStrokes():
     keybindsCsv = pd.DataFrame(data, columns=header)
     keybindsCsv.to_csv("keybinds.csv", index=False)
 
+    # Update the button list
     makeBtns()
+
+    # Return to the main menu
+    changeFrame(mainFrame, macroRecordFrame, None)
 
 
 def replayMacro(btnId):
-    # Load the key strokes file
+    # Load the keystrokes file
     fName = str(btnId) + "_keylog.csv"
     data = (pd.read_csv(fName)).to_records()
 
-    # For each key stroke/row press/release the key
+    # For each keystroke/row press/release the key
     for row in data:
         if row[2] == "down":
             keyboard.press(row[1])
@@ -277,6 +328,117 @@ def saveLink():
     changeFrame(mainFrame, linkEnterFrame, None)
 
 
+def runObsFunction(function):
+    if obs is not None:
+        try:
+            match function:
+                case "Mic mute":
+                    obs.micToggle()
+                case "Desktop mute":
+                    obs.desktopAudioToggle()
+                case "Switch screen":  # This case should not happen
+                    pass
+                case "Start stream":
+                    obs.startStreaming()
+                case "Stop stream":
+                    obs.stopStreaming()
+                case "Start recording":
+                    obs.startRecording()
+                case "Stop recording":
+                    obs.stopRecording()
+                case "Pause recording":
+                    obs.pauseRecording()
+                case "Resume recording":
+                    obs.resumeRecording()
+        except:
+            pass
+
+
+def saveSwitchFrame():
+    scene = getStringVariables(sceneVar)
+
+    # Create obsfunc.txt file with the scene name in it
+    fName = str(activeBtn) + "_obsfunc.txt"
+
+    with open(fName, "w") as file:
+        file.write(scene)
+
+    # Change the function type in the keybinds.csv, change the function to the file name of the keylog.csv file
+    data = (pd.read_csv("keybinds.csv")).to_records()
+    data[activeBtn][1] = 4
+    data[activeBtn][2] = fName
+
+    # Write to the keybinds.csv file
+    keybindsCsv = pd.DataFrame(data, columns=header)
+    keybindsCsv.to_csv("keybinds.csv", index=False)
+
+    # Update the button list
+    makeBtns()
+
+    # Return to the main menu
+    changeFrame(mainFrame, obsSwitchFrame, None)
+
+
+def saveObsFunctions():
+    global obsSwitchFrame, obs
+    op = getStringVariables(opVar)
+
+    # If Switch screen option is selected, create a new frame and switch to it, else continue saving normal obs functions
+    if op == "Switch screen":
+        if obs is not None:
+            scenesRaw = obs.getSceneList()
+            scenes = []
+            for scene in scenesRaw:
+                scenes.append(scene['name'])
+            obsSwitchFrame = createObsSwitchFrame(scenes)
+            changeFrame(obsSwitchFrame, obsFrame, None)
+            return
+        else:
+            try:
+                obs = OBS()
+                scenesRaw = obs.getSceneList()
+                scenes = []
+                for scene in scenesRaw:
+                    scenes.append(scene['name'])
+                obsSwitchFrame = createObsSwitchFrame(scenes)
+                changeFrame(obsSwitchFrame, obsFrame, None)
+                return
+            except:
+                pass
+
+    # Load keybinds.csv
+    csvFile = pd.read_csv("keybinds.csv")
+    data = csvFile.to_records()
+
+    # Set the correct function type and function in keybinds.csv
+    data[activeBtn][1] = 4
+    data[activeBtn][2] = op
+
+    # Write to the csv file
+    csvFile = pd.DataFrame(data, columns=header)
+    csvFile.to_csv("keybinds.csv", index=False)
+
+    # Update the button list
+    makeBtns()
+
+    # Return to the main menu
+    changeFrame(mainFrame, obsFrame, None)
+
+
+def runSwitchFrame(path):
+    global obs
+    # Read the file to get the scene name, and run the obs function
+    with open(path, "r") as file:
+        if obs is not None:
+            obs.switchScene(file.readline())
+        else:
+            try:
+                obs = OBS()
+                obs.switchScene(file.readline())
+            except:
+                pass
+
+
 """ ---Misc Functions--- """
 
 
@@ -293,19 +455,35 @@ def changeFrame(frame1, frame2, btnId):
     frame2.pack_forget()
 
 
+def switchObsScreen():
+    global obsSwitchFrame
+
+    # Gets all the scenes from obs, creates a new frame with a dropdown menu of all the scenes and changes to that frame
+    sceneList = obs.getSceneList()
+    sceneNames = []
+    for scene in sceneList:
+        sceneNames.append(scene['name'])
+    obsSwitchFrame = createObsSwitchFrame(sceneNames)
+    changeFrame(obsSwitchFrame, obsFrame, None)
+
+
 def getStringVariables(var):
     return var.get()
 
 
 def createVariables():
     # Creates initial StringVars
-    global activeBtn, keyStrokes, pathEntVar, textEntVar, linkEntVar
+    global activeBtn, keyStrokes, pathEntVar, textEntVar, linkEntVar, opVar, sceneVar
 
     activeBtn = None
     keyStrokes = None
     pathEntVar = StringVar()
     textEntVar = StringVar()
     linkEntVar = StringVar()
+    opVar = StringVar()
+    opVar.set("Mic mute")
+    sceneVar = StringVar()
+    sceneVar.set("Select scene")
 
 
 def defaultFileSetup():
@@ -332,7 +510,7 @@ def makeBtns():
     # Populates btn class in grid with function and function types from the keybinds.csv file
     global grid
     data = (pd.read_csv("keybinds.csv")).to_records()
-    # 0 = Run Program, 1 = Key stroke, 2 = Text, 3 = Link
+    # 0 = Run Program, 1 = Key stroke, 2 = Text, 3 = Link, 4 = Obs function
     for row in data:
         if row[1] == "0":
             grid[row[0]].funcType = 0
@@ -346,6 +524,13 @@ def makeBtns():
         elif row[1] == "3":
             grid[row[0]].funcType = 3
             grid[row[0]].url = row[2]
+        elif row[1] == "4":
+            grid[row[0]].funcType = 4
+            if "_obsfunc" in row[2]:
+                grid[row[0]].path = row[2]
+                grid[row[0]].obs = None
+            else:
+                grid[row[0]].obs = row[2]
 
 
 def hardwareCheck(port):
@@ -363,6 +548,7 @@ def hardwareCheck(port):
 
 
 def btnListen():
+    global obs
     while True:
         if serialPort.in_waiting > 0:
             serialString = serialPort.readline()
@@ -396,6 +582,20 @@ def btnListen():
                         time.sleep(0.2)
                     except:
                         pass
+
+                elif grid[msg].funcType == 4:  # Obs function
+                    try:
+                        if obs is None:
+                            obs = OBS()
+
+                        # Run obs functions
+                        if grid[msg].obs is not None:  # Run normal obs functions
+                            runObsFunction(grid[msg].obs)
+                        elif "_obsfunc" in grid[msg].path:  # Run scene switch
+                            runSwitchFrame(grid[msg].path)
+                        time.sleep(0.2)
+                    except:
+                        pass
             except:
                 pass
 
@@ -413,11 +613,14 @@ def main():
     while not deviceFound:
         for port in ports:
             if hardwareCheck(port):
-                serialPort = serial.Serial(port=port.name, baudrate=9600, bytesize=8, timeout=2,
+                try:
+                    serialPort = serial.Serial(port=port.name, baudrate=9600, bytesize=8, timeout=2,
                                            stopbits=serial.STOPBITS_ONE)
-                deviceFound = True
+                    deviceFound = True
+                except:
+                    pass
 
-    global mainFrame, bindFrame, runProgramFrame, macroRecordFrame, textEnterFrame, linkEnterFrame
+    global mainFrame, bindFrame, runProgramFrame, macroRecordFrame, textEnterFrame, linkEnterFrame, obsFrame
     global grid
 
     backgroundImg = PhotoImage(file="assets/background.png")  # Background image of the MainFrame
@@ -433,6 +636,7 @@ def main():
     macroRecordFrame = createMacroRecordFrame()
     textEnterFrame = createTextEnterFrame()
     linkEnterFrame = createLinkEnterFrame()
+    obsFrame = createObsFrame()
 
     # Create 4x4 grid buttons from Btn class
     btnId = 0
@@ -460,6 +664,11 @@ def quitWindow(icon, item):
     # Closes the program completely from the system tray
     icon.stop()
     win.destroy()
+
+    try:
+        obs.disconnect()
+    except:
+        pass
     quit()
 
 
