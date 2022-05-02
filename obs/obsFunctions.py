@@ -20,8 +20,7 @@ class OBS:
         self.ws.call(requests.ToggleMute("Desktop Audio"))
 
     def getSceneList(self):
-        arrRaw = self.ws.call(requests.GetSceneList())
-        return arrRaw.getScenes()
+        return (self.ws.call(requests.GetSceneList())).getScenes()
 
     def switchScene(self, scene):
         self.ws.call(requests.SetCurrentScene(scene))
