@@ -8,7 +8,7 @@ class OBS:
     def __init__(self):
         self.host = "localhost"
         self.port = 4444
-        self.password = "Tengo2004"
+        self.password = "12345678"
 
         self.ws = obsws(self.host, self.port, self.password)
         self.ws.connect()
